@@ -1,0 +1,17 @@
+{
+  "name": "eco-wash",
+  "version": "1.0.0",
+  "description": "",
+  "main": "ecowash_bot.js",
+  "scripts": {
+    "start": "node ecowash_bot.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "node-telegram-bot-api": "^0.67.0"
+  }
+}
