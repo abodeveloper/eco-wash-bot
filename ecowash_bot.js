@@ -18,10 +18,10 @@ if (!BOT_TOKEN) {
 }
 const ADMIN_ID = Number(process.env.ADMIN_ID);
 const GROUP_ID = Number(process.env.GROUP_ID);
-if (!Number.isFinite(ADMIN_ID)) {
+if (!process.env.ADMIN_ID || !Number.isFinite(ADMIN_ID)) {
   throw new Error("Missing/invalid ADMIN_ID env var. Example: ADMIN_ID=123456789");
 }
-if (!Number.isFinite(GROUP_ID)) {
+if (!process.env.GROUP_ID || !Number.isFinite(GROUP_ID)) {
   throw new Error("Missing/invalid GROUP_ID env var. Example: GROUP_ID=-1001234567890");
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,14 +189,11 @@ function backOnlyKeyboard() {
   };
 }
 
-// Telegram "Markdown" parse_mode'ida user kiritgan matn formatni sinib yubormasligi uchun
-// maxsus belgilarni escape qilamiz.
+// Telegram "Markdown" (v1) parse_mode'ida user kiritgan matn formatni sinib yubormasligi uchun
+// maxsus belgilarni escape qilamiz. Markdown V1 da faqat ushbu format belgilar qochirilishi mumkin.
 function escapeMarkdown(text) {
   const s = String(text ?? "");
-  // Ko'p ishlatiladigan Telegram Markdown special belgilarini escape qilamiz.
-  // Eslatma: telefon raqamlari uchun `+` ni escape qilmaymiz, aks holda
-  // Telegram Markdown qayta ishlashda `\+` ko'rinib qolishi mumkin.
-  return s.replace(/([_*\[\]()~`>#\-=|{}.!\\])/g, "\\$1");
+  return s.replace(/([_*\[`\\])/g, "\\$1");
 }
 
 function formatMoney(num) {
@@ -624,9 +621,10 @@ async function goBack(chatId) {
 // ── XABAR HANDLERI ────────────────────────────────────────────────────────────
 
 bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const text = (msg.text || "").trim();
-  const sess = getSession(chatId);
+  try {
+    const chatId = msg.chat.id;
+    const text = (msg.text || "").trim();
+    const sess = getSession(chatId);
 
   if (text === "/start") return stepStart(chatId);
   if (text === "📝 Buyurtma berish") return stepAskName(chatId);
@@ -786,18 +784,29 @@ bot.on("message", async (msg) => {
     default:
       return stepStart(chatId);
   }
+  } catch (error) {
+    console.error("❌ Xatolik yuz berdi (message handler):", error.message);
+  }
 });
 
 // ── CALLBACK QUERY ────────────────────────────────────────────────────────────
 
 bot.on("callback_query", async (query) => {
-  const chatId = query.message.chat.id;
-  const msgId = query.message.message_id;
+  try {
+    const chatId = query.message.chat.id;
+    const msgId = query.message.message_id;
 
-  await bot.answerCallbackQuery(query.id);
+    await bot.answerCallbackQuery(query.id);
 
   if (query.data === "confirm") {
     const sess = getSession(chatId);
+    if (sess.state !== STATE.CONFIRM) {
+      await bot.sendMessage(chatId, "⚠️ Ushbu buyurtma allaqachon yuborilgan yoki yaroqsiz.");
+      return;
+    }
+    // Race-condition va double-click larni oldini olish uchun qayta bosishni yopamiz
+    sess.state = STATE.IDLE;
+
     const text = formatZayavka(sess.data);
     await sendToAdminAndGroup(text);
     await bot.editMessageText(
@@ -813,7 +822,11 @@ bot.on("callback_query", async (query) => {
       chat_id: chatId,
       message_id: msgId,
     });
-    clearSession(chatId);
+    
+    // Foydalanuvchi joriy sessiyada yiqqan elementlarini butkul yo'qotib qo'ymasligi uchun
+    // faqat holatni ismi so'rashga qaytaramiz:
+    const sess = getSession(chatId);
+    sess.state = STATE.ASK_NAME;
     return stepAskName(chatId);
   } else if (query.data === "cancel") {
     await bot.editMessageText(
@@ -821,6 +834,9 @@ bot.on("callback_query", async (query) => {
       { chat_id: chatId, message_id: msgId },
     );
     clearSession(chatId);
+  }
+  } catch (error) {
+    console.error("❌ Xatolik yuz berdi (callback handler):", error.message);
   }
 });
 
