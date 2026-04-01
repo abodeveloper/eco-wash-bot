@@ -779,6 +779,15 @@ bot.on("message", async (msg) => {
       if (text !== "🚫 Izohsiz davom etish") {
         sess.data.note = text;
       }
+      
+      // Eski pastki menyuni yo'q qilish uchun vaqtincha xabar jo'natib darxol o'chiramiz
+      try {
+        const tempMsg = await bot.sendMessage(chatId, "⏳...", {
+          reply_markup: { remove_keyboard: true }
+        });
+        await bot.deleteMessage(chatId, tempMsg.message_id);
+      } catch (e) {}
+
       return stepConfirm(chatId);
 
     default:
