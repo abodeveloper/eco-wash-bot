@@ -543,7 +543,10 @@ async function stepConfirm(chatId) {
             { text: "✅ Tasdiqlash", callback_data: "confirm" },
             { text: "✏️ Qayta kiritish", callback_data: "restart" },
           ],
-          [{ text: "❌ Bekor qilish", callback_data: "cancel" }],
+          [
+            { text: "⬅️ Orqaga", callback_data: "back" },
+            { text: "❌ Bekor qilish", callback_data: "cancel" }
+          ],
         ],
       },
     },
@@ -843,6 +846,9 @@ bot.on("callback_query", async (query) => {
       { chat_id: chatId, message_id: msgId },
     );
     clearSession(chatId);
+  } else if (query.data === "back") {
+    await bot.deleteMessage(chatId, msgId).catch(() => {});
+    return goBack(chatId);
   }
   } catch (error) {
     console.error("❌ Xatolik yuz berdi (callback handler):", error.message);
