@@ -376,7 +376,18 @@ async function sendToAdminAndGroup(text) {
 async function stepStart(chatId) {
   clearSession(chatId);
 
-  const captionBase =
+  if (isAdmin(chatId)) {
+    return bot.sendMessage(
+      chatId,
+      "🔐 *Administrator* — bu akkauntdan mijoz buyurtmasi yuborib bo'lmaydi.",
+      {
+        parse_mode: "Markdown",
+        reply_markup: { remove_keyboard: true },
+      },
+    );
+  }
+
+  const caption =
     `🌿 *ECO WASH NAVOIY*\n` +
     `_Navoiy shahridagi professional tozalash xizmati_\n\n` +
     `✨ *Nima uchun bizni tanlashingiz kerak?*\n` +
@@ -387,22 +398,15 @@ async function stepStart(chatId) {
     `✅ Qulay narxlar, chegirmalar\n\n` +
     `💎 *Xizmatlarimiz va narxlar:*\n` +
     SERVICES.map((s) => `${s.label} — *${s.price}*`).join("\n") +
-    `\n\n🤝 Bizga ishoning — sizning qulayligingiz bizning maqsadimiz!`;
+    `\n\n🤝 Bizga ishoning — sizning qulayligingiz bizning maqsadimiz!\n\n` +
+    `👇 Buyurtma berish uchun quyidagi tugmani bosing:`;
 
-  const adminNote =
-    `\n\n🔐 *Administrator* — bu akkauntdan mijoz buyurtmasi yuborib bo'lmaydi.`;
-  const userNote = `\n\n👇 Buyurtma berish uchun quyidagi tugmani bosing:`;
-
-  const caption = captionBase + (isAdmin(chatId) ? adminNote : userNote);
-
-  const replyMarkup = isAdmin(chatId)
-    ? { reply_markup: { remove_keyboard: true } }
-    : {
-        reply_markup: {
-          keyboard: [[{ text: "📝 Buyurtma berish" }]],
-          resize_keyboard: true,
-        },
-      };
+  const replyMarkup = {
+    reply_markup: {
+      keyboard: [[{ text: "📝 Buyurtma berish" }]],
+      resize_keyboard: true,
+    },
+  };
 
   if (WELCOME_PHOTO) {
     try {
