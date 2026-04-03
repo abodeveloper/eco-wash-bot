@@ -24,6 +24,8 @@ if (!process.env.ADMIN_ID || !Number.isFinite(ADMIN_ID)) {
 if (!process.env.GROUP_ID || !Number.isFinite(GROUP_ID)) {
   throw new Error("Missing/invalid GROUP_ID env var. Example: GROUP_ID=-1001234567890");
 }
+/** Vercel (yoki boshqa HTTPS) dagi Mini App URL. Bo'sh bo'lsa tugma ko'rinmaydi. */
+const MINI_APP_URL = String(process.env.MINI_APP_URL || "").trim();
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Rasm qo'shish uchun: "./banner.jpg" yoki "https://..." URL
@@ -78,83 +80,8 @@ const CART_VIEW = "🧾 Savatni ko'rish";
 const CART_REMOVE_LAST = "➖ Oxirgisini o'chirish";
 const CART_CLEAR = "🗑 Savatni tozalash";
 
-// ── XIZMATLAR ─────────────────────────────────────────────────────────────────
-const SERVICES = [
-  {
-    key: "gilam",
-    label: "🧺 Gilam yuvish",
-    unit: "m²",
-    ask: "📐 Gilamingizning taxminiy maydoni qancha?\n\n💡 _Aniq o'lchamini bilmasangiz ham xavotir olmang — taxminan aytishingiz kifoya. Ustamiz kelganda o'zi o'lchab aniqlashtiradi._",
-    amounts: [
-      "5 m²",
-      "10 m²",
-      "15 m²",
-      "20 m²",
-      "25 m²",
-      "30 m²",
-      "40 m²",
-      "50 m²",
-      "50+ m²",
-    ],
-    price: "12 000 so'm/m²",
-  },
-  {
-    key: "adyol",
-    label: "🛏️ Adyol yuvish",
-    unit: "dona",
-    ask: "🛏️ Nechta adyol yuvishni xohlaysiz?",
-    amounts: ["1", "2", "3", "4", "5", "6", "7", "8", "10+"],
-    price: "60 000 so'm/dona",
-  },
-  {
-    key: "mebil",
-    label: "🛋️ Mebel yuvish",
-    unit: "dona",
-    ask: "🛋️ Nechta mebel buyumini yuvish kerak?\n_(Masalan: divan, kreslo va hokazo)_",
-    amounts: ["1", "2", "3", "4", "5", "6+"],
-    price: "60 000 so'm/dona",
-  },
-  {
-    key: "stul",
-    label: "🪑 Stul yuvish",
-    unit: "dona",
-    ask: "🪑 Nechta stulni yuvish kerak?",
-    amounts: ["1", "2", "4", "6", "8", "10", "12", "15", "20+"],
-    price: "25 000 so'm/dona",
-  },
-  {
-    key: "joyida",
-    label: "🏠 Joyida yuvish",
-    unit: "m²",
-    ask: "📐 Joyida yuvilishi kerak bo'lgan gilamning taxminiy maydoni qancha?\n\n💡 _Aniq o'lchamini bilmasangiz ham xavotir olmang — taxminan aytishingiz kifoya. Ustamiz kelganda o'zi aniqlashtiradi._",
-    amounts: ["10 m²", "15 m²", "20 m²", "30 m²", "40 m²", "50 m²", "60+ m²"],
-    price: "15 000 so'm/m²",
-  },
-  {
-    key: "korpacha",
-    label: "🟫 Ko'rpacha yuvish",
-    unit: "dona",
-    ask: "🟫 Nechta ko'rpachani yuvish kerak?",
-    amounts: ["1", "2", "3", "4", "5", "6", "7", "8", "10+"],
-    price: "45 000 so'm/dona",
-  },
-  {
-    key: "yostiq",
-    label: "😴 Yostiq yuvish",
-    unit: "dona",
-    ask: "😴 Nechta yostiqni yuvish kerak?",
-    amounts: ["1", "2", "3", "4", "5", "6", "8", "10+"],
-    price: "10 000 so'm/dona",
-  },
-  {
-    key: "kurpa",
-    label: "🌙 Ko'rpa yuvish",
-    unit: "dona",
-    ask: "🌙 Nechta ko'rpani yuvish kerak?",
-    amounts: ["1", "2", "3", "4", "5", "6+"],
-    price: "100 000 so'm/dona",
-  },
-];
+// ── XIZMATLAR (services.json — bot va Mini App bir xil ro'yxat) ───────────────
+const SERVICES = require("./services.json");
 
 // ── YORDAMCHI FUNKSIYALAR ─────────────────────────────────────────────────────
 
@@ -288,6 +215,94 @@ function computeGrandTotal(items) {
   return { total, hasPlus };
 }
 
+/** Mini App dan kelgan JSON: narx va miqdorni serverda qayta hisoblaymiz. */
+function normalizeMiniAppOrder(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const name = String(payload.name || "").trim();
+  const phone = String(payload.phone || "").trim();
+  const address = String(payload.address || "").trim();
+  if (!name || !phone || !address) return null;
+  const cleaned = phone.replace(/\s+/g, "");
+  if (!/^\+?\d{7,15}$/.test(cleaned)) return null;
+  const phoneNorm = cleaned.startsWith("+") ? cleaned : "+" + cleaned;
+  const rawItems = Array.isArray(payload.items) ? payload.items : [];
+  if (!rawItems.length) return null;
+
+  const merged = new Map();
+  for (const it of rawItems) {
+    const label = String(it.service || "").trim();
+    const service = getServiceByLabel(label);
+    if (!service) return null;
+    const amountStr =
+      String(it.amountText || "").trim() || String(it.qty ?? "");
+    const parsed = parseQuantity(amountStr);
+    if (!parsed || !parsed.qty) return null;
+    const unit = parseMoney(service.price);
+    if (!unit) return null;
+
+    if (merged.has(service.label)) {
+      const ex = merged.get(service.label);
+      ex.qty += parsed.qty;
+      ex.isPlus = Boolean(ex.isPlus) || parsed.isPlus;
+      ex.unitPrice = unit;
+      ex.total = ex.qty * unit;
+      ex.amountText = formatAmount(ex.qty, ex.unit, ex.isPlus);
+    } else {
+      merged.set(service.label, {
+        service: service.label,
+        unit: service.unit,
+        amountText: formatAmount(parsed.qty, service.unit, parsed.isPlus),
+        qty: parsed.qty,
+        isPlus: parsed.isPlus,
+        unitPrice: unit,
+        total: parsed.qty * unit,
+      });
+    }
+  }
+  const noteRaw = String(payload.note || "").trim().slice(0, 1000);
+
+  return {
+    name,
+    phone: phoneNorm,
+    address,
+    items: [...merged.values()],
+    ...(noteRaw ? { note: noteRaw } : {}),
+  };
+}
+
+async function handleMiniAppOrder(chatId, fromId, rawData) {
+  if (isAdmin(fromId)) {
+    return bot.sendMessage(
+      chatId,
+      "⚠️ Administrator sifatida buyurtma yuborib bo'lmaydi.",
+    );
+  }
+  let payload;
+  try {
+    payload = JSON.parse(rawData);
+  } catch {
+    return bot.sendMessage(
+      chatId,
+      "⚠️ Ma'lumotni o'qib bo'lmadi. Qayta urinib ko'ring.",
+    );
+  }
+  const data = normalizeMiniAppOrder(payload);
+  if (!data) {
+    return bot.sendMessage(
+      chatId,
+      "⚠️ Buyurtma ma'lumotlari to'liq emas yoki noto'g'ri. Mini ilovada qayta to'ldiring.",
+    );
+  }
+  clearSession(chatId);
+  const text = formatZayavka(data);
+  await sendToAdminAndGroup(text);
+  return bot.sendMessage(
+    chatId,
+    "✅ *Buyurtmangiz qabul qilindi!*\n\nTez orada xodimimiz siz bilan bog'lanadi.\n\n/start — bosh menyuga.",
+    { parse_mode: "Markdown", reply_markup: { remove_keyboard: true } },
+  );
+}
+
 function formatZayavka(data) {
   const line = "━━━━━━━━━━━━━━━━━━━━━━";
   const name = escapeMarkdown(data.name || "—");
@@ -399,11 +414,20 @@ async function stepStart(chatId) {
     `💎 *Xizmatlarimiz va narxlar:*\n` +
     SERVICES.map((s) => `${s.label} — *${s.price}*`).join("\n") +
     `\n\n🤝 Bizga ishoning — sizning qulayligingiz bizning maqsadimiz!\n\n` +
-    `👇 Buyurtma berish uchun quyidagi tugmani bosing:`;
+    `👇 Buyurtma berish uchun tugmalardan birini tanlang:` +
+    (MINI_APP_URL
+      ? `\n\n_📱 Mini ilova_ — barcha bosqichlarni bir joyda to'ldirish.`
+      : "");
 
+  const startKeyboard = [[{ text: "📝 Buyurtma berish" }]];
+  if (MINI_APP_URL) {
+    startKeyboard.push([
+      { text: "📱 Mini ilova orqali", web_app: { url: MINI_APP_URL } },
+    ]);
+  }
   const replyMarkup = {
     reply_markup: {
-      keyboard: [[{ text: "📝 Buyurtma berish" }]],
+      keyboard: startKeyboard,
       resize_keyboard: true,
     },
   };
@@ -651,6 +675,10 @@ bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
     const text = (msg.text || "").trim();
     const sess = getSession(chatId);
+
+    if (msg.web_app_data?.data) {
+      return handleMiniAppOrder(chatId, msg.from.id, msg.web_app_data.data);
+    }
 
   if (text === "/start") return stepStart(chatId);
   if (text === "📝 Buyurtma berish") {

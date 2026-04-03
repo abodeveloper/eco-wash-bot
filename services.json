@@ -1,0 +1,66 @@
+[
+  {
+    "key": "gilam",
+    "label": "🧺 Gilam yuvish",
+    "unit": "m²",
+    "ask": "📐 Gilamingizning taxminiy maydoni qancha?\n\n💡 Aniq o'lchamini bilmasangiz ham xavotir olmang — taxminan aytishingiz kifoya. Ustamiz kelganda o'zi o'lchab aniqlashtiradi.",
+    "amounts": ["5 m²", "10 m²", "15 m²", "20 m²", "25 m²", "30 m²", "40 m²", "50 m²", "50+ m²"],
+    "price": "12 000 so'm/m²"
+  },
+  {
+    "key": "adyol",
+    "label": "🛏️ Adyol yuvish",
+    "unit": "dona",
+    "ask": "🛏️ Nechta adyol yuvishni xohlaysiz?",
+    "amounts": ["1", "2", "3", "4", "5", "6", "7", "8", "10+"],
+    "price": "60 000 so'm/dona"
+  },
+  {
+    "key": "mebil",
+    "label": "🛋️ Mebel yuvish",
+    "unit": "dona",
+    "ask": "🛋️ Nechta mebel buyumini yuvish kerak?\n(Masalan: divan, kreslo va hokazo)",
+    "amounts": ["1", "2", "3", "4", "5", "6+"],
+    "price": "60 000 so'm/dona"
+  },
+  {
+    "key": "stul",
+    "label": "🪑 Stul yuvish",
+    "unit": "dona",
+    "ask": "🪑 Nechta stulni yuvish kerak?",
+    "amounts": ["1", "2", "4", "6", "8", "10", "12", "15", "20+"],
+    "price": "25 000 so'm/dona"
+  },
+  {
+    "key": "joyida",
+    "label": "🏠 Joyida yuvish",
+    "unit": "m²",
+    "ask": "📐 Joyida yuvilishi kerak bo'lgan gilamning taxminiy maydoni qancha?\n\n💡 Aniq o'lchamini bilmasangiz ham xavotir olmang — taxminan aytishingiz kifoya. Ustamiz kelganda o'zi aniqlashtiradi.",
+    "amounts": ["10 m²", "15 m²", "20 m²", "30 m²", "40 m²", "50 m²", "60+ m²"],
+    "price": "15 000 so'm/m²"
+  },
+  {
+    "key": "korpacha",
+    "label": "🟫 Ko'rpacha yuvish",
+    "unit": "dona",
+    "ask": "🟫 Nechta ko'rpachani yuvish kerak?",
+    "amounts": ["1", "2", "3", "4", "5", "6", "7", "8", "10+"],
+    "price": "45 000 so'm/dona"
+  },
+  {
+    "key": "yostiq",
+    "label": "😴 Yostiq yuvish",
+    "unit": "dona",
+    "ask": "😴 Nechta yostiqni yuvish kerak?",
+    "amounts": ["1", "2", "3", "4", "5", "6", "8", "10+"],
+    "price": "10 000 so'm/dona"
+  },
+  {
+    "key": "kurpa",
+    "label": "🌙 Ko'rpa yuvish",
+    "unit": "dona",
+    "ask": "🌙 Nechta ko'rpani yuvish kerak?",
+    "amounts": ["1", "2", "3", "4", "5", "6+"],
+    "price": "100 000 so'm/dona"
+  }
+]
