@@ -158,6 +158,11 @@ const SERVICES = [
 
 // ── YORDAMCHI FUNKSIYALAR ─────────────────────────────────────────────────────
 
+/** Buyurtma oqimi faqat shaxsiy chatda; guruh/superguruhda javob bermaymiz. */
+function isPrivateChat(chat) {
+  return Boolean(chat && chat.type === "private");
+}
+
 function getSession(chatId) {
   if (!sessions[chatId]) sessions[chatId] = { state: STATE.IDLE, data: {} };
   return sessions[chatId];
@@ -625,6 +630,8 @@ async function goBack(chatId) {
 
 bot.on("message", async (msg) => {
   try {
+    if (!isPrivateChat(msg.chat)) return;
+
     const chatId = msg.chat.id;
     const text = (msg.text || "").trim();
     const sess = getSession(chatId);
@@ -805,6 +812,11 @@ bot.on("message", async (msg) => {
 
 bot.on("callback_query", async (query) => {
   try {
+    if (!query.message || !isPrivateChat(query.message.chat)) {
+      await bot.answerCallbackQuery(query.id).catch(() => {});
+      return;
+    }
+
     const chatId = query.message.chat.id;
     const msgId = query.message.message_id;
 
