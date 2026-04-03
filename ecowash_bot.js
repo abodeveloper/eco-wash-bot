@@ -163,6 +163,11 @@ function isPrivateChat(chat) {
   return Boolean(chat && chat.type === "private");
 }
 
+/** Shaxsiy chatda chat.id foydalanuvchi id si bilan bir xil. */
+function isAdmin(telegramId) {
+  return Number(telegramId) === ADMIN_ID;
+}
+
 function getSession(chatId) {
   if (!sessions[chatId]) sessions[chatId] = { state: STATE.IDLE, data: {} };
   return sessions[chatId];
@@ -371,7 +376,7 @@ async function sendToAdminAndGroup(text) {
 async function stepStart(chatId) {
   clearSession(chatId);
 
-  const caption =
+  const captionBase =
     `🌿 *ECO WASH NAVOIY*\n` +
     `_Navoiy shahridagi professional tozalash xizmati_\n\n` +
     `✨ *Nima uchun bizni tanlashingiz kerak?*\n` +
@@ -382,15 +387,22 @@ async function stepStart(chatId) {
     `✅ Qulay narxlar, chegirmalar\n\n` +
     `💎 *Xizmatlarimiz va narxlar:*\n` +
     SERVICES.map((s) => `${s.label} — *${s.price}*`).join("\n") +
-    `\n\n🤝 Bizga ishoning — sizning qulayligingiz bizning maqsadimiz!\n\n` +
-    `👇 Buyurtma berish uchun quyidagi tugmani bosing:`;
+    `\n\n🤝 Bizga ishoning — sizning qulayligingiz bizning maqsadimiz!`;
 
-  const replyMarkup = {
-    reply_markup: {
-      keyboard: [[{ text: "📝 Buyurtma berish" }]],
-      resize_keyboard: true,
-    },
-  };
+  const adminNote =
+    `\n\n🔐 *Administrator* — bu akkauntdan mijoz buyurtmasi yuborib bo'lmaydi.`;
+  const userNote = `\n\n👇 Buyurtma berish uchun quyidagi tugmani bosing:`;
+
+  const caption = captionBase + (isAdmin(chatId) ? adminNote : userNote);
+
+  const replyMarkup = isAdmin(chatId)
+    ? { reply_markup: { remove_keyboard: true } }
+    : {
+        reply_markup: {
+          keyboard: [[{ text: "📝 Buyurtma berish" }]],
+          resize_keyboard: true,
+        },
+      };
 
   if (WELCOME_PHOTO) {
     try {
@@ -637,7 +649,16 @@ bot.on("message", async (msg) => {
     const sess = getSession(chatId);
 
   if (text === "/start") return stepStart(chatId);
-  if (text === "📝 Buyurtma berish") return stepAskName(chatId);
+  if (text === "📝 Buyurtma berish") {
+    if (isAdmin(chatId)) {
+      return bot.sendMessage(
+        chatId,
+        "⚠️ Administrator sifatida buyurtma berib bo'lmaydi.",
+        { reply_markup: { remove_keyboard: true } },
+      );
+    }
+    return stepAskName(chatId);
+  }
 
   // Orqaga tugmasi — istalgan bosqichda ishlaydi
   if (text === BACK_BTN) return goBack(chatId);
@@ -651,6 +672,16 @@ bot.on("message", async (msg) => {
         reply_markup: { remove_keyboard: true },
       },
     );
+  }
+
+  if (isAdmin(chatId) && sess.state !== STATE.IDLE) {
+    clearSession(chatId);
+    await bot.sendMessage(
+      chatId,
+      "⚠️ Administrator buyurtma bosqichlarida ishlata olmaydi.\n\n/start — bosh menyuga qaytish.",
+      { reply_markup: { remove_keyboard: true } },
+    );
+    return stepStart(chatId);
   }
 
   switch (sess.state) {
@@ -828,6 +859,13 @@ bot.on("callback_query", async (query) => {
       await bot.sendMessage(chatId, "⚠️ Ushbu buyurtma allaqachon yuborilgan yoki yaroqsiz.");
       return;
     }
+    if (isAdmin(query.from.id)) {
+      await bot.sendMessage(
+        chatId,
+        "⚠️ Administrator sifatida buyurtma yuborib bo'lmaydi.",
+      );
+      return;
+    }
     // Race-condition va double-click larni oldini olish uchun qayta bosishni yopamiz
     sess.state = STATE.IDLE;
 
@@ -842,6 +880,14 @@ bot.on("callback_query", async (query) => {
     );
     clearSession(chatId);
   } else if (query.data === "restart") {
+    if (isAdmin(query.from.id)) {
+      await bot.editMessageText(
+        "⚠️ Administrator buyurtma formasidan foydalana olmaydi.\n\n/start — bosh menyuga.",
+        { chat_id: chatId, message_id: msgId },
+      );
+      clearSession(chatId);
+      return stepStart(chatId);
+    }
     await bot.editMessageText("🔄 Qaytadan boshlanmoqda...", {
       chat_id: chatId,
       message_id: msgId,
